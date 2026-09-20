@@ -50,6 +50,19 @@ button:hover {
   box-shadow: 0 8px 18px rgba(34, 32, 28, 0.08);
 }
 
+button:disabled,
+input:disabled,
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  transform: none;
+  border-color: var(--line);
+  box-shadow: none;
+}
+
 button.primary {
   background: var(--ink);
   color: #fffaf1;
@@ -84,7 +97,37 @@ select:focus {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.lock-message {
+  flex-basis: 100%;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffdf8;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lock-message[data-tone="warn"] {
+  border-color: var(--red);
+  background: rgba(164, 64, 55, 0.08);
+  color: var(--red);
+}
+
+.lock-message[data-tone="ok"] {
+  border-color: var(--green);
+  background: rgba(60, 112, 86, 0.1);
+  color: var(--green);
+}
+
+#lockBtn.locked {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #fffaf1;
 }
 
 .eyebrow {
@@ -295,6 +338,16 @@ h3 {
   background: var(--red);
 }
 
+.badge.locked {
+  background: var(--gold);
+}
+
+.badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .stage {
   margin: 0 auto;
   display: grid;
@@ -349,6 +402,26 @@ h3 {
 
 .cell.vertical {
   writing-mode: vertical-rl;
+}
+
+.stage.locked {
+  border-color: var(--red);
+}
+
+.stage.locked .cell {
+  cursor: not-allowed;
+}
+
+.stage.locked .cell:hover {
+  background: rgba(255, 253, 248, 0.5);
+}
+
+.stage.locked .cell.used:hover {
+  background: rgba(47, 41, 33, 0.9);
+}
+
+.type-card[draggable="false"] {
+  cursor: not-allowed;
 }
 
 .usage-list,

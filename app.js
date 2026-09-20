@@ -14,6 +14,7 @@ const defaultState = {
   selectedTypeId: starterInventory[0].id,
   placements: [],
   drafts: [],
+  locked: false,
   settings: {
     paperSize: "postcard",
     flowMode: "horizontal",
@@ -47,7 +48,11 @@ const els = {
   inventoryCount: document.querySelector("#inventoryCount"),
   saveDraftBtn: document.querySelector("#saveDraftBtn"),
   exportBtn: document.querySelector("#exportBtn"),
-  clearBoardBtn: document.querySelector("#clearBoardBtn")
+  clearBoardBtn: document.querySelector("#clearBoardBtn"),
+  lockBtn: document.querySelector("#lockBtn"),
+  lockMessage: document.querySelector("#lockMessage"),
+  lockBadge: document.querySelector("#lockBadge"),
+  stageHint: document.querySelector("#stageHint")
 };
 
 function loadState() {
@@ -91,6 +96,13 @@ function getUsage() {
   }, {});
 }
 
+function getShortages() {
+  const usage = getUsage();
+  return state.inventory
+    .filter((item) => (usage[item.id] || 0) > item.quantity)
+    .map((item) => ({ item, used: usage[item.id] }));
+}
+
 function renderSettings() {
   els.paperSize.value = state.settings.paperSize;
   els.flowMode.value = state.settings.flowMode;
@@ -111,6 +123,7 @@ function renderInventory() {
   const keyword = els.inventorySearch.value.trim();
   const style = els.styleFilter.value;
   const usage = getUsage();
+  const locked = state.locked;
   const items = state.inventory.filter((item) => {
     const matchesKeyword = !keyword || `${item.char}${item.style}${item.wear}`.includes(keyword);
     const matchesStyle = style === "all" || item.style === style;
@@ -123,13 +136,13 @@ function renderInventory() {
       const used = usage[item.id] || 0;
       const selected = item.id === state.selectedTypeId ? "selected" : "";
       return `
-        <article class="type-card ${selected}" draggable="true" data-type-id="${item.id}">
+        <article class="type-card ${selected}" draggable="${locked ? "false" : "true"}" data-type-id="${item.id}">
           <div class="glyph" style="font-size:${Math.min(item.size, 36)}px">${escapeHtml(item.char)}</div>
           <div class="type-meta">
             <strong>${escapeHtml(item.char)} · ${escapeHtml(item.style)}</strong>
             <span>${item.size}px · ${escapeHtml(item.wear)} · 已用${used}/${item.quantity}</span>
           </div>
-          <button class="mini-btn" title="删除字模" data-delete-type="${item.id}" type="button">×</button>
+          <button class="mini-btn" title="删除字模" data-delete-type="${item.id}" type="button" ${locked ? "disabled" : ""}>×</button>
         </article>
       `;
     })
@@ -139,7 +152,7 @@ function renderInventory() {
 function renderStage() {
   const { cols, rows } = getGrid();
   const map = new Map(state.placements.map((item) => [placementKey(item.row, item.col), item]));
-  els.stage.className = `stage ${state.settings.paperSize}`;
+  els.stage.className = `stage ${state.settings.paperSize}${state.locked ? " locked" : ""}`;
   els.stage.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   els.stage.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
   els.stage.style.gap = `${state.settings.gridGap}px`;
@@ -164,7 +177,7 @@ function renderUsage() {
   const entries = state.inventory.filter((item) => usage[item.id]);
   els.placedCount.textContent = `${state.placements.length}个落字`;
 
-  const shortages = entries.filter((item) => usage[item.id] > item.quantity);
+  const shortages = getShortages();
   els.shortageBadge.textContent = shortages.length ? `${shortages.length}处超量` : "数量充足";
   els.shortageBadge.className = `badge ${shortages.length ? "warn" : "ok"}`;
 
@@ -193,7 +206,7 @@ function renderDrafts() {
         (draft) => `
           <article class="draft-item">
             <strong>${escapeHtml(draft.title)}</strong>
-            <span>${draft.placements.length}个落字 · ${new Date(draft.savedAt).toLocaleString("zh-CN")}</span>
+            <span>${draft.placements.length}个落字 · ${new Date(draft.savedAt).toLocaleString("zh-CN")}${draft.locked ? " · 已开印锁定" : ""}</span>
             <div class="draft-actions">
               <button type="button" data-load-draft="${draft.id}">载入</button>
               <button type="button" data-delete-draft="${draft.id}">删除</button>
@@ -204,9 +217,35 @@ function renderDrafts() {
       .join("") || `<p class="empty">还没有保存草稿。</p>`;
 }
 
+function renderLock() {
+  const locked = state.locked;
+  els.lockBtn.textContent = locked ? "解除锁定" : "开印锁定";
+  els.lockBtn.classList.toggle("locked", locked);
+  els.lockBadge.hidden = !locked;
+  els.stageHint.textContent = locked
+    ? "版面已开印锁定，落字与版面设置均为只读，可导出预览图或解除锁定。"
+    : "点击字模后，在版面格子中落字，也可拖拽字模到版面。";
+  [
+    els.paperSize,
+    els.flowMode,
+    els.gridGap,
+    els.workTitle,
+    els.charInput,
+    els.styleInput,
+    els.sizeInput,
+    els.quantityInput,
+    els.wearInput,
+    els.clearBoardBtn,
+    els.typeForm.querySelector('button[type="submit"]')
+  ].forEach((el) => {
+    el.disabled = locked;
+  });
+}
+
 function renderAll() {
   saveState();
   renderSettings();
+  renderLock();
   renderStyleFilter();
   renderInventory();
   renderStage();
@@ -214,8 +253,37 @@ function renderAll() {
   renderDrafts();
 }
 
+function setLockMessage(text, tone = "") {
+  els.lockMessage.textContent = text;
+  els.lockMessage.hidden = !text;
+  els.lockMessage.dataset.tone = tone;
+}
+
+function toggleLock() {
+  if (state.locked) {
+    state.locked = false;
+    renderAll();
+    setLockMessage("已解除锁定，可继续调整版面。", "ok");
+    return;
+  }
+  const problems = [];
+  if (!state.settings.workTitle.trim()) problems.push("作品名为空，请先填写作品名");
+  const shortages = getShortages();
+  if (shortages.length) {
+    const detail = shortages.map(({ item, used }) => `${item.char}·${item.style} ${used}/${item.quantity}`).join("，");
+    problems.push(`存在${shortages.length}处超量字模（${detail}），请减少落字或补充字模`);
+  }
+  if (problems.length) {
+    setLockMessage(`无法开印锁定：${problems.join("；")}。`, "warn");
+    return;
+  }
+  state.locked = true;
+  renderAll();
+  setLockMessage("已开印锁定：版面冻结，落字与设置不可更改，可导出预览图或解除锁定。", "ok");
+}
+
 function placeType(row, col, typeId = state.selectedTypeId) {
-  if (!typeId) return;
+  if (state.locked || !typeId) return;
   const existingIndex = state.placements.findIndex((item) => item.row === row && item.col === col);
   if (existingIndex >= 0) {
     if (state.placements[existingIndex].typeId === typeId) {
@@ -231,6 +299,7 @@ function placeType(row, col, typeId = state.selectedTypeId) {
 
 function addType(event) {
   event.preventDefault();
+  if (state.locked) return;
   const item = {
     id: crypto.randomUUID(),
     char: els.charInput.value.trim(),
@@ -255,6 +324,7 @@ function saveDraft() {
     title,
     settings: structuredClone(state.settings),
     placements: structuredClone(state.placements),
+    locked: state.locked,
     savedAt: new Date().toISOString()
   });
   state.drafts = state.drafts.slice(0, 8);
@@ -310,6 +380,7 @@ function escapeHtml(value) {
 }
 
 els.paperSize.addEventListener("change", () => {
+  if (state.locked) return;
   state.settings.paperSize = els.paperSize.value;
   const { cols, rows } = getGrid();
   state.placements = state.placements.filter((item) => item.row < rows && item.col < cols);
@@ -317,16 +388,19 @@ els.paperSize.addEventListener("change", () => {
 });
 
 els.flowMode.addEventListener("change", () => {
+  if (state.locked) return;
   state.settings.flowMode = els.flowMode.value;
   renderAll();
 });
 
 els.gridGap.addEventListener("input", () => {
+  if (state.locked) return;
   state.settings.gridGap = Number(els.gridGap.value);
   renderAll();
 });
 
 els.workTitle.addEventListener("input", () => {
+  if (state.locked) return;
   state.settings.workTitle = els.workTitle.value;
   saveState();
 });
@@ -334,9 +408,11 @@ els.workTitle.addEventListener("input", () => {
 els.typeForm.addEventListener("submit", addType);
 els.inventorySearch.addEventListener("input", renderInventory);
 els.styleFilter.addEventListener("change", renderInventory);
+els.lockBtn.addEventListener("click", toggleLock);
 els.saveDraftBtn.addEventListener("click", saveDraft);
 els.exportBtn.addEventListener("click", exportPreview);
 els.clearBoardBtn.addEventListener("click", () => {
+  if (state.locked) return;
   state.placements = [];
   renderAll();
 });
@@ -344,6 +420,7 @@ els.clearBoardBtn.addEventListener("click", () => {
 els.typeList.addEventListener("click", (event) => {
   const deleteButton = event.target.closest("[data-delete-type]");
   if (deleteButton) {
+    if (state.locked) return;
     const typeId = deleteButton.dataset.deleteType;
     state.inventory = state.inventory.filter((item) => item.id !== typeId);
     state.placements = state.placements.filter((item) => item.typeId !== typeId);
@@ -358,12 +435,17 @@ els.typeList.addEventListener("click", (event) => {
 });
 
 els.typeList.addEventListener("dragstart", (event) => {
+  if (state.locked) {
+    event.preventDefault();
+    return;
+  }
   const card = event.target.closest("[data-type-id]");
   if (!card) return;
   event.dataTransfer.setData("text/plain", card.dataset.typeId);
 });
 
 els.stage.addEventListener("dragover", (event) => {
+  if (state.locked) return;
   if (event.target.closest(".cell")) event.preventDefault();
 });
 
@@ -388,7 +470,13 @@ els.draftList.addEventListener("click", (event) => {
     if (!draft) return;
     state.settings = structuredClone(draft.settings);
     state.placements = structuredClone(draft.placements);
+    state.locked = Boolean(draft.locked);
     renderAll();
+    if (state.locked) {
+      setLockMessage("草稿已载入，并保持开印锁定状态。", "ok");
+    } else {
+      setLockMessage("");
+    }
   }
   if (deleteButton) {
     state.drafts = state.drafts.filter((item) => item.id !== deleteButton.dataset.deleteDraft);
