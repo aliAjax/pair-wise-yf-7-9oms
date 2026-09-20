@@ -50,6 +50,19 @@ button:hover {
   box-shadow: 0 8px 18px rgba(34, 32, 28, 0.08);
 }
 
+button:disabled,
+input:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:disabled:hover {
+  transform: none;
+  border-color: var(--line);
+  box-shadow: none;
+}
+
 button.primary {
   background: var(--ink);
   color: #fffaf1;
@@ -85,6 +98,19 @@ select:focus {
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.lock-notice {
+  width: 100%;
+  margin: 0;
+  border: 1px solid rgba(164, 64, 55, 0.45);
+  border-radius: 6px;
+  background: rgba(164, 64, 55, 0.1);
+  color: var(--red);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .eyebrow {
@@ -295,6 +321,22 @@ h3 {
   background: var(--red);
 }
 
+.badge.lock {
+  background: var(--gold);
+}
+
+.badge-stack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#lockBtn.locked {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #fffaf1;
+}
+
 .stage {
   margin: 0 auto;
   display: grid;
@@ -349,6 +391,28 @@ h3 {
 
 .cell.vertical {
   writing-mode: vertical-rl;
+}
+
+.stage.locked {
+  border-style: double;
+  border-width: 4px;
+  box-shadow: inset 0 0 0 14px rgba(183, 134, 44, 0.18);
+}
+
+.stage.locked .cell {
+  cursor: not-allowed;
+}
+
+.stage.locked .cell:hover {
+  background: rgba(255, 253, 248, 0.5);
+}
+
+.stage.locked .cell.used:hover {
+  background: rgba(47, 41, 33, 0.9);
+}
+
+body.is-locked .type-card {
+  cursor: default;
 }
 
 .usage-list,
